@@ -1,17 +1,27 @@
+import os
+
 from reportlab.platypus import Image, Spacer, Table, Paragraph
 from reportlab.lib.units import cm
 from reportlab.lib.styles import getSampleStyleSheet
-import charts
+from reportlab.lib import colors
+from reportlab.graphics.charts.textlabels import Label
+from reportlab.lib.colors import Color
+from reportlab.lib.pagesizes import A4
+from reportlab.graphics.shapes import Drawing, Polygon, Circle
+import utils.charts as charts
 from pandas import Series
 
+print(f"Value of color is {charts.BG_COLOR} {type(charts.BG_COLOR)}")
+
+PAGE_WIDTH, PAGE_HEIGHT = A4
+TOP_MARGIN = BOTTOM_MARGIN = cm / 4
+LEFT_MARGIN = RIGHT_MARGIN = cm
 styles = getSampleStyleSheet()
 TEXT_H = styles['title']
 H4 = styles['Heading4']
 SPACE_L = Spacer(100 * cm, cm / 3)
 SPACE_M = Spacer(100 * cm, cm / 5)
 SPACE_S = Spacer(100 * cm, cm / 10)
-
-print('Add the index to data for empties')
 
 
 def get_charts(data):
@@ -61,7 +71,7 @@ def get_charts(data):
 
 
 def title():
-    return Paragraph("Wisdom Test and Math Challenge", style=TEXT_H)
+    return Paragraph("Wisdom Tests And Math Challenge", style=TEXT_H)
 
 
 def report_table(data):
@@ -75,7 +85,8 @@ def report_table(data):
                                   f'{row[6]}', f'{row[7]}', f'{row[8]}'))
     report_table_style = (
         ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 0), (-1, 0), (0.1, 0.1, 1)),
+        ('TEXTCOLOR', (0, 0), (-1, 0), (1, 1, 1)),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), (Color(0.33, 0.75, 0.80, 1), Color(1, 1, 1, 0)))
     )
     return Table(report_table_data, style=report_table_style)
 
@@ -91,8 +102,13 @@ def perf_title():
     return Paragraph("Student Performance", style=TEXT_H)
 
 
-def stu_pic(number):
-    return Image(f"Pics//{number}.jpg", width=2.5 * cm, height=3 * cm, hAlign="RIGHT")
+def stu_pic(number: int, img: str):
+    logo = Image("logo.png", width=4 * cm, height=2 * cm, hAlign='CENTER')
+    pic = Image(f"{img}//{number}.jpg", width=2.5 * cm, height=3 * cm, hAlign="RIGHT")
+    data = (
+        (logo, pic),
+    )
+    return Table(data, style=(('VALIGN', (0, 0), (-1, -1), 'TOP'),), hAlign='RIGHT', colWidths=(10 * cm, 3 * cm))
 
 
 def stu_detail(data):
@@ -114,23 +130,53 @@ def stu_detail(data):
     return Table(student_detail, style=tbl_style, colWidths=(None, 6 * cm, None, None))
 
 
-def all_components(number, data):
-    return [title(),
-            stu_pic(number),
+def border():
+    draw = Drawing(1, 1)
+    rect = Polygon(points=[-12, cm / 6, (PAGE_WIDTH - (RIGHT_MARGIN + LEFT_MARGIN)), cm / 6,
+                           PAGE_WIDTH - (RIGHT_MARGIN + LEFT_MARGIN),
+                           -1 * (PAGE_HEIGHT - (TOP_MARGIN + BOTTOM_MARGIN + cm / 2)),
+                           -12, -1 * (PAGE_HEIGHT - (TOP_MARGIN + BOTTOM_MARGIN + cm / 2))],
+                   strokeColor=Color(*charts.BG_COLOR))
+    rect.fillColor = Color(*charts.BG_COLOR, 0.1)
+    draw.add(rect)
+    draw.add(Circle(100, 90, 5, fillColor=colors.green))
+    lab = Label()
+    lab.setOrigin(350, -50)
+    lab.boxAnchor = 'ne'
+    lab.fillColor = Color(*charts.BG_COLOR, 0.15)
+    lab.fontSize = 72
+    lab.angle = 60
+    lab.dx = 0
+    lab.dy = 0
+    lab.setText('Wisdom Tests')
+    draw.add(lab)
+    return draw
+
+
+def all_components(number, data, img_location):
+    return [border(),
+            title(),
+            stu_pic(number, img_location),
             SPACE_M,
             stu_detail(data.filter(items=["Name of Candidate",
                                           "Registration",
-                                          "Grade", "Gender", "Name of school", "Date of Birth", "City of Residence",
-                                          "Date and time of test", "Country of Residence", "Extra time assistance",
+                                          "Grade", "Gender", "Name of school", "Date of Birth",
+                                          "City of Residence",
+                                          "Date and time of test", "Country of Residence",
+                                          "Extra time assistance",
                                           ]).head(1).values),
             SPACE_L,
             perf_title(),
             report_table(data.filter(
-                items=("Question No.", "Time Spent on question (sec)", "Score if correct", "Score if incorrect",
+                items=("Question No.", "Time Spent on question (sec)", "Score if correct",
+                       "Score if incorrect",
                        "Attempt status",
-                       "What you marked", "Correct Answer", "Outcome (Correct/Incorrect/Not Attempted)",
+                       "What you marked", "Correct Answer",
+                       "Outcome (Correct/Incorrect/Not Attempted)",
                        "Your score")).values),
             SPACE_S,
-            totals(data.filter(items=('Your score',)).sum(), data.filter(items=('Score if correct',)).sum()),
+            totals(data.filter(items=('Your score',)).sum(),
+                   data.filter(items=('Score if correct',)).sum()),
             SPACE_L,
-            get_charts(data)]
+            get_charts(data),
+            ]
